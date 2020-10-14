@@ -65,26 +65,15 @@ func (r *Rooms) Upgrade(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Rooms) Start() {
-	prometheusTicker := time.NewTicker(time.Second * 5)
-	if !r.config.Prometheus {
-		prometheusTicker.Stop()
-	}
 	for {
-		select {
-		case msg := <-r.Incoming:
-			if err := msg.Incoming.Execute(r, msg.Info); err != nil {
-				msg.Info.Close <- err.Error()
-			}
-		case <-prometheusTicker.C:
-			roomGauge.Set(float64(len(r.Rooms)))
-			users := 0
-			sessions := 0
-			for _, room := range r.Rooms {
-				users += len(room.Users)
-				sessions += len(room.Sessions)
-			}
-			userGauge.Set(float64(users))
-			sessionGauge.Set(float64(sessions))
+		msg := <-r.Incoming
+		if err := msg.Incoming.Execute(r, msg.Info); err != nil {
+			msg.Info.Close <- err.Error()
 		}
 	}
+}
+
+func (r *Rooms) CloseRoom(roomId string) {
+	delete(r.Rooms, roomId)
+	roomsClosedTotal.Inc()
 }
